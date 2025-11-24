@@ -6,3 +6,6 @@ feel free to use/edit em
 
 ![Better Customer List](https://github.com/PyrexBLJ/Schedule-I-Mods/tree/main/BetterCustomerList)
 Adds a percentage of your relationship with a customer on the list when assigning them to dealers, not actually sure if it matters but i only like giving em to dealers once its maxed out and switching apps in the phone was annoying.
+
+![Cartel Dealer Alerts](https://github.com/PyrexBLJ/Schedule-I-Mods/tree/main/CartelDealerAlert)
+Puts a message on screen and plays a sound when a cartel dealer is out making a delivery. Tells you what part of town they are in so you can do hunt em down.
