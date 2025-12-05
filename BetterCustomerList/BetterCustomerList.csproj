@@ -201,9 +201,6 @@
 		<Reference Include="Unity.InputSystem.ForUI">
 			<HintPath>/home/pyrex/.local/share/Steam/steamapps/common/Schedule I/MelonLoader/Il2CppAssemblies/Unity.InputSystem.ForUI.dll</HintPath>
 		</Reference>
-		<Reference Include="Unity.InputSystem.RebindingUI">
-			<HintPath>/home/pyrex/.local/share/Steam/steamapps/common/Schedule I/MelonLoader/Il2CppAssemblies/Unity.InputSystem.RebindingUI.dll</HintPath>
-		</Reference>
 		<Reference Include="Unity.InputSystem">
 			<HintPath>/home/pyrex/.local/share/Steam/steamapps/common/Schedule I/MelonLoader/Il2CppAssemblies/Unity.InputSystem.dll</HintPath>
 		</Reference>
