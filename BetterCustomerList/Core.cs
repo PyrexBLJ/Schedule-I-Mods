@@ -56,7 +56,7 @@ public class Core : MelonMod
         __instance.customerEntries.Add(component);
         __instance.entryToCustomer.Add(component, customer);
 
-        Msg("Created entry for " + customer.NPC.fullName);
+        //Msg("Created entry for " + customer.NPC.fullName);
 
         SortEntries(__instance);
 
