@@ -15,7 +15,7 @@ using System.Collections.Generic;
 using static MelonLoader.Modules.MelonModule;
 using System.Diagnostics.Tracing;
 
-[assembly: MelonInfo(typeof(BetterCustomerList.Core), "BetterCustomerList", "1.0.2", "Pyrex", null)]
+[assembly: MelonInfo(typeof(BetterCustomerList.Core), "BetterCustomerList", "1.0.3", "Pyrex", null)]
 [assembly: MelonGame("TVGS", "Schedule I")]
 namespace BetterCustomerList;
 
@@ -40,9 +40,9 @@ public class Core : MelonMod
         float relation_percent = (customer.NPC.RelationData.RelationDelta / 5) * 100;
         string full_string = $"<size={fontsize.Value}>{customer.NPC.fullName}    ";
         if (relation_percent == 100.0f)
-            full_string += $"<color=#ffcc00>{relation_percent}%</color>";
+            full_string += $"<color=#ffcc00>{relation_percent.ToString("0")}%</color>";
         else
-            full_string += $"{relation_percent}%";
+            full_string += $"{relation_percent.ToString("0")}%";
         if (showregion.Value == true)
         {
             full_string += $" ({customer.NPC.Region})</size>";
