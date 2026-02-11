@@ -21,7 +21,15 @@ public class Core : MelonMod
     private static MelonPreferences_Entry<float> fontsize;
     private static MelonPreferences_Entry<bool> showregion;
 
-    private class SortData {
+    // Tracking instances manually to maintain high FPS by avoiding FindObjectsOfType.
+    private static List<CustomerSelector> _trackedSelectors = new List<CustomerSelector>();
+    private static Dictionary<int, float> _activationTimes = new Dictionary<int, float>();
+    private static Dictionary<int, float> _lastRefreshTimes = new Dictionary<int, float>();
+
+    private float _nextUpdateTick = 0f;
+
+    private class SortData
+    {
         public RectTransform Entry;
         public string Name;
     }
@@ -31,68 +39,113 @@ public class Core : MelonMod
         category = MelonPreferences.CreateCategory("BetterCustomerList", "Better Customer List");
         fontsize = category.CreateEntry<float>("TextSize", 22.0f, "Text size", "Font size for entries.");
         showregion = category.CreateEntry<bool>("ShowRegion", true, "Show Region", "Show region at end of listing.");
+        MelonLogger.Msg("Better Customer List [v1.0.4] Initialized.");
     }
 
     private static void RefreshEntryText(UnityEngine.UI.Text nameText, Customer customer)
     {
         if (customer == null || customer.NPC == null || customer.NPC.RelationData == null) return;
 
+        // RELATIONSHIP LOGIC: Maps internal 0.0 - 5.0 range to 0-100% display.
         float delta = customer.NPC.RelationData.RelationDelta;
-        
-        // LOGIC FIX: Maps the internal 0.0 - 5.0 relationship range to a 0-100 percentage.
-        // This ensures the list accurately reflects high-level relationship progress 
-        // instead of capping early or displaying incorrect fractional values.
-        float relation_percent = (delta / 5.0f) * 100f;
-        relation_percent = UnityEngine.Mathf.Clamp(relation_percent, 0f, 100f);
+        float relation_percent = UnityEngine.Mathf.Clamp((delta / 5.0f) * 100f, 0f, 100f);
 
-        // STAGE COLORS: Maps relationship percentages to specific UI colors 
-        // to provide better visual feedback for relationship stages.
+        // STAGE COLORS: Visual feedback based on relationship tiers.
         string stageColor;
-        if (relation_percent <= 20f) stageColor = "#A63536";      // Red (Low)
+        if (relation_percent <= 20f) stageColor = "#A63536";      // Red
         else if (relation_percent <= 40f) stageColor = "#D58949"; // Orange
-        else if (relation_percent <= 60f) stageColor = "#B1B3B1"; // Gray (Neutral)
+        else if (relation_percent <= 60f) stageColor = "#B1B3B1"; // Gray
         else if (relation_percent <= 80f) stageColor = "#58A2D8"; // Cyan
-        else if (relation_percent < 100f) stageColor = "#5DD547"; // Green (High)
-        else stageColor = "#00FF00";                             // Intense Green (Max)
+        else if (relation_percent < 100f) stageColor = "#5DD547"; // Green
+        else stageColor = "#00FF00";                             // Max Green
 
         string full_string = $"<size={fontsize.Value}>{customer.NPC.fullName}    ";
-        
-        // Render percentage with color-coded stage feedback
         full_string += $"<color={stageColor}>{relation_percent.ToString("0")}%</color>";
 
-        if (showregion.Value)
-            full_string += $" ({customer.NPC.Region})</size>";
-        else
-            full_string += "</size>";
+        if (showregion.Value) full_string += $" ({customer.NPC.Region})</size>";
+        else full_string += "</size>";
 
-        nameText.text = full_string;
-    }
-
-    // SYNC FIX: Relationship data often hasn't synchronized when the selector list 
-    // is first initialized. This Coroutine triggers a refresh after a short 
-    // delay to ensure the UI reflects the actual loaded save data.
-    private static IEnumerator DelayedRefresh(UnityEngine.UI.Text nameText, Customer customer)
-    {
-        yield return new WaitForSeconds(0.2f);
-        RefreshEntryText(nameText, customer);
-        yield return new WaitForSeconds(1.0f);
-        RefreshEntryText(nameText, customer);
-    }
-
-    // REFRESH FIX: Iterates through the existing UI entries to force a recalculation
-    // of all relationship percentages using current game data.
-    private static void OnEnable_Postfix(CustomerSelector __instance)
-    {
-        if (__instance.customerEntries == null) return;
-
-        foreach (var entry in __instance.customerEntries)
+        if (nameText.text != full_string)
         {
-            if (__instance.entryToCustomer.TryGetValue(entry, out Customer customer))
+            nameText.text = full_string;
+        }
+    }
+
+    private void RefreshSelector(CustomerSelector selector, string context)
+    {
+        if (selector.customerEntries == null || selector.entryToCustomer == null) return;
+
+        // Log maintenance only, as requested.
+        if (context == "Maintenance")
+        {
+            MelonLogger.Msg($"Refreshing {selector.name} ({context})");
+        }
+
+        foreach (var entry in selector.customerEntries)
+        {
+            if (selector.entryToCustomer.TryGetValue(entry, out Customer customer))
             {
-                UnityEngine.UI.Text nameText = entry.Find("Name")?.GetComponent<UnityEngine.UI.Text>();
-                if (nameText != null)
+                var nameText = entry.Find("Name")?.GetComponent<UnityEngine.UI.Text>();
+                if (nameText != null) RefreshEntryText(nameText, customer);
+            }
+        }
+    }
+
+    public override void OnUpdate()
+    {
+        if (Time.time < _nextUpdateTick) return;
+        _nextUpdateTick = Time.time + 0.1f;
+
+        for (int i = _trackedSelectors.Count - 1; i >= 0; i--)
+        {
+            var selector = _trackedSelectors[i];
+            if (selector == null || selector.gameObject == null)
+            {
+                _trackedSelectors.RemoveAt(i);
+                continue;
+            }
+
+            int id = selector.GetHashCode();
+
+            // VISIBILITY CHECK: Only updates if active and Y-position is within view.
+            RectTransform rt = selector.GetComponent<RectTransform>();
+            bool isActuallyOnScreen = selector.gameObject.activeInHierarchy && (rt != null && rt.position.y > -200f);
+
+            if (isActuallyOnScreen)
+            {
+                if (!_activationTimes.ContainsKey(id))
                 {
-                    RefreshEntryText(nameText, customer);
+                    _activationTimes[id] = Time.time;
+                    _lastRefreshTimes[id] = 0f;
+                    MelonLogger.Msg($"[BetterCustomerList] Visibility DETECTED for {selector.name}. Starting 3s update burst.");
+                }
+
+                float timeSinceActive = Time.time - _activationTimes[id];
+
+                if (timeSinceActive < 3.0f)
+                {
+                    if (Time.time > _lastRefreshTimes[id] + 0.1f)
+                    {
+                        _lastRefreshTimes[id] = Time.time;
+                        RefreshSelector(selector, "Burst");
+                    }
+                }
+                else
+                {
+                    if (Time.time > _lastRefreshTimes[id] + 2.0f)
+                    {
+                        _lastRefreshTimes[id] = Time.time;
+                        RefreshSelector(selector, "Maintenance");
+                    }
+                }
+            }
+            else
+            {
+                if (_activationTimes.ContainsKey(id))
+                {
+                    _activationTimes.Remove(id);
+                    _lastRefreshTimes.Remove(id);
+                    MelonLogger.Msg($"[BetterCustomerList] Visibility LOST for {selector.name}. Update cycle stopped.");
                 }
             }
         }
@@ -100,41 +153,37 @@ public class Core : MelonMod
 
     private static bool CreateEntry_Hook(Customer customer, CustomerSelector __instance)
     {
+        if (!_trackedSelectors.Contains(__instance))
+        {
+            _trackedSelectors.Add(__instance);
+        }
+
         GameObject entryObj = UnityEngine.Object.Instantiate<GameObject>(__instance.ButtonPrefab, __instance.EntriesContainer);
         RectTransform component = entryObj.GetComponent<RectTransform>();
-        
+
         component.Find("Mugshot").GetComponent<UnityEngine.UI.Image>().sprite = customer.NPC.MugshotSprite;
         UnityEngine.UI.Text nameText = component.Find("Name").GetComponent<UnityEngine.UI.Text>();
-        
-        // Initial setup
+
         RefreshEntryText(nameText, customer);
 
-        // Handle initial data synchronization delay
-        MelonCoroutines.Start(DelayedRefresh(nameText, customer));
-
         component.GetComponent<Button>().onClick.AddListener(new Action(() => __instance.CustomerSelected(customer)));
-        
         __instance.customerEntries.Add(component);
         __instance.entryToCustomer.Add(component, customer);
 
-        SortEntries(__instance);
+        SortEntriesLocally(__instance);
         return false;
     }
 
-    private static void SortEntries(CustomerSelector instance)
+    private static void SortEntriesLocally(CustomerSelector instance)
     {
         List<SortData> entryList = new List<SortData>();
         foreach (var entry in instance.customerEntries)
         {
             if (instance.entryToCustomer.TryGetValue(entry, out Customer customer))
             {
-                entryList.Add(new SortData { 
-                    Entry = entry, 
-                    Name = customer.NPC?.fullName?.ToString() ?? "" 
-                });
+                entryList.Add(new SortData { Entry = entry, Name = customer.NPC?.fullName?.ToString() ?? "" });
             }
         }
-
         entryList.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.CurrentCultureIgnoreCase));
 
         instance.customerEntries.Clear();
@@ -145,41 +194,28 @@ public class Core : MelonMod
         }
     }
 
-    private static void Hook(HarmonyLib.Harmony harmony, Type targetType, string methodName, string hookMethod, Type[] arguments = null, bool postHook = true)
-    {
-        MethodInfo method = (arguments == null) 
-            ? targetType.GetMethod(methodName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
-            : targetType.GetMethod(methodName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, arguments);
-
-        MethodInfo hook = typeof(Core).GetMethod(hookMethod, BindingFlags.Static | BindingFlags.NonPublic);
-        if (method == null || hook == null) return;
-
-        if (postHook)
-            harmony.Patch(method, postfix: new HarmonyMethod(hook));
-        else
-            harmony.Patch(method, prefix: new HarmonyMethod(hook));
-    }
-
     public override void OnSceneWasLoaded(int buildIndex, string sceneName)
     {
         if (sceneName == "Main" || sceneName == "Tutorial")
         {
-            harmony = new HarmonyLib.Harmony("BetterCustomerList.Hooks");
-            
-            // Hook for initial entry creation
-            Hook(harmony, typeof(CustomerSelector), "CreateEntry", nameof(CreateEntry_Hook), postHook: false);
-            
-            // FIX: Refresh the list every time the app is opened to ensure data is current.
-            Hook(harmony, typeof(CustomerSelector), "OnEnable", nameof(OnEnable_Postfix), postHook: true);
+            _trackedSelectors.Clear();
+            harmony = new HarmonyLib.Harmony("BetterCustomerList.SyncFix");
+            MethodInfo createMethod = typeof(CustomerSelector).GetMethod("CreateEntry", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            MethodInfo createHook = typeof(Core).GetMethod("CreateEntry_Hook", BindingFlags.Static | BindingFlags.NonPublic);
+            harmony.Patch(createMethod, prefix: new HarmonyMethod(createHook));
+            MelonLogger.Msg("Better Customer List hooks injected.");
         }
         base.OnSceneWasLoaded(buildIndex, sceneName);
     }
 
     public override void OnSceneWasUnloaded(int buildIndex, string sceneName)
     {
-        if((sceneName == "Main" || sceneName == "Tutorial") && harmony != null)
+        if ((sceneName == "Main" || sceneName == "Tutorial") && harmony != null)
         {
             harmony.UnpatchSelf();
+            _trackedSelectors.Clear();
+            _activationTimes.Clear();
+            _lastRefreshTimes.Clear();
         }
         base.OnSceneWasUnloaded(buildIndex, sceneName);
     }
