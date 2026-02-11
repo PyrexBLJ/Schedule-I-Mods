@@ -1,4 +1,4 @@
-﻿using Il2CppScheduleOne.Economy;
+using Il2CppScheduleOne.Economy;
 using Il2CppScheduleOne.UI.Phone;
 using MelonLoader;
 using UnityEngine;
@@ -6,17 +6,12 @@ using UnityEngine.UI;
 using HarmonyLib;
 using System.Reflection;
 using System;
-using System.Drawing;
-using static MelonLoader.MelonLogger;
-using System.Linq;
-using Unity.Collections;
 using System.Collections;
 using System.Collections.Generic;
-using static MelonLoader.Modules.MelonModule;
-using System.Diagnostics.Tracing;
 
-[assembly: MelonInfo(typeof(BetterCustomerList.Core), "BetterCustomerList", "1.0.3", "Pyrex", null)]
+[assembly: MelonInfo(typeof(BetterCustomerList.Core), "BetterCustomerList", "1.0.4", "Pyrex", null)]
 [assembly: MelonGame("TVGS", "Schedule I")]
+
 namespace BetterCustomerList;
 
 public class Core : MelonMod
@@ -26,118 +21,142 @@ public class Core : MelonMod
     private static MelonPreferences_Entry<float> fontsize;
     private static MelonPreferences_Entry<bool> showregion;
 
+    private class SortData {
+        public RectTransform Entry;
+        public string Name;
+    }
+
     public override void OnInitializeMelon()
     {
-        LoggerInstance.Msg("Better Customer List Loaded.");
         category = MelonPreferences.CreateCategory("BetterCustomerList", "Better Customer List");
-        fontsize = category.CreateEntry<float>("TextSize", 22.0f, "Text size", "Set the size of the font used to make each customer entry, to fit more info on screen. changes show after save quit.");
-        showregion = category.CreateEntry<bool>("ShowRegion", true, "Show Region", "Add the region the customer is from at the end of their listing. changes show after save quit.");
+        fontsize = category.CreateEntry<float>("TextSize", 22.0f, "Text size", "Font size for entries.");
+        showregion = category.CreateEntry<bool>("ShowRegion", true, "Show Region", "Show region at end of listing.");
     }
+
+    private static void RefreshEntryText(UnityEngine.UI.Text nameText, Customer customer)
+    {
+        if (customer == null || customer.NPC == null || customer.NPC.RelationData == null) return;
+
+        float delta = customer.NPC.RelationData.RelationDelta;
+        
+        // FIX: Mapping the 0.0 - 5.0 relationship scale to a 0-100 percentage.
+        // This ensures that high-level relationships display correctly instead of 
+        // capping early or showing incorrect fractional values.
+        float relation_percent = (delta / 5.0f) * 100f;
+        relation_percent = UnityEngine.Mathf.Clamp(relation_percent, 0f, 100f);
+
+        // STAGE COLORS: Maps relationship percentages to specific UI colors 
+        // to provide better visual feedback for relationship stages.
+        string stageColor;
+        if (relation_percent <= 20f) stageColor = "#A63536";      // Red (Low)
+        else if (relation_percent <= 40f) stageColor = "#D58949"; // Orange
+        else if (relation_percent <= 60f) stageColor = "#B1B3B1"; // Gray (Neutral)
+        else if (relation_percent <= 80f) stageColor = "#58A2D8"; // Cyan
+        else if (relation_percent < 100f) stageColor = "#5DD547"; // Green (High)
+        else stageColor = "#00FF00";                             // Intense Green (Max)
+
+        string full_string = $"<size={fontsize.Value}>{customer.NPC.fullName}    ";
+        
+        // Render percentage with color-coded stage feedback
+        full_string += $"<color={stageColor}>{relation_percent.ToString("0")}%</color>";
+
+        if (showregion.Value)
+            full_string += $" ({customer.NPC.Region})</size>";
+        else
+            full_string += "</size>";
+
+        nameText.text = full_string;
+    }
+
+    // FIX: Relationship data often hasn't synchronized when the selector list 
+    // is first initialized. This Coroutine triggers a refresh after a short 
+    // delay to ensure the UI reflects the actual loaded save data.
+    private static IEnumerator DelayedRefresh(UnityEngine.UI.Text nameText, Customer customer)
+    {
+        yield return new WaitForSeconds(0.2f);
+        RefreshEntryText(nameText, customer);
+        yield return new WaitForSeconds(1.0f);
+        RefreshEntryText(nameText, customer);
+    }
+
     private static bool CreateEntry_Hook(Customer customer, CustomerSelector __instance)
     {
-        RectTransform component = UnityEngine.Object.Instantiate<GameObject>(__instance.ButtonPrefab, __instance.EntriesContainer).GetComponent<RectTransform>();
+        GameObject entryObj = UnityEngine.Object.Instantiate<GameObject>(__instance.ButtonPrefab, __instance.EntriesContainer);
+        RectTransform component = entryObj.GetComponent<RectTransform>();
+        
         component.Find("Mugshot").GetComponent<UnityEngine.UI.Image>().sprite = customer.NPC.MugshotSprite;
-        float relation_percent = (customer.NPC.RelationData.RelationDelta / 5) * 100;
-        string full_string = $"<size={fontsize.Value}>{customer.NPC.fullName}    ";
-        if (relation_percent == 100.0f)
-            full_string += $"<color=#ffcc00>{relation_percent.ToString("0")}%</color>";
-        else
-            full_string += $"{relation_percent.ToString("0")}%";
-        if (showregion.Value == true)
-        {
-            full_string += $" ({customer.NPC.Region})</size>";
-        }
-        else
-        {
-            full_string += "</size>";
-        }
-        component.Find("Name").GetComponent<UnityEngine.UI.Text>().text = full_string;
-        component.GetComponent<Button>().onClick.AddListener((UnityEngine.Events.UnityAction)(() => __instance.CustomerSelected(customer)));
+        UnityEngine.UI.Text nameText = component.Find("Name").GetComponent<UnityEngine.UI.Text>();
+        
+        // Initial text generation
+        RefreshEntryText(nameText, customer);
+
+        // Queue a refresh for late-loading data sync
+        MelonCoroutines.Start(DelayedRefresh(nameText, customer));
+
+        component.GetComponent<Button>().onClick.AddListener(new Action(() => __instance.CustomerSelected(customer)));
+        
         __instance.customerEntries.Add(component);
         __instance.entryToCustomer.Add(component, customer);
 
-        //Msg("Created entry for " + customer.NPC.fullName);
-
         SortEntries(__instance);
-
         return false;
     }
 
     private static void SortEntries(CustomerSelector instance)
     {
-        var entryList = new System.Collections.Generic.List<(RectTransform entry, string name)>();
-        
+        List<SortData> entryList = new List<SortData>();
         foreach (var entry in instance.customerEntries)
         {
             if (instance.entryToCustomer.TryGetValue(entry, out Customer customer))
             {
-                string customerName = customer.NPC?.fullName?.ToString() ?? "";
-                entryList.Add((entry, customerName));
+                entryList.Add(new SortData { 
+                    Entry = entry, 
+                    Name = customer.NPC?.fullName?.ToString() ?? "" 
+                });
             }
         }
 
-        entryList.Sort((a, b) => string.Compare(a.name, b.name, StringComparison.CurrentCultureIgnoreCase));
+        entryList.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.CurrentCultureIgnoreCase));
 
         instance.customerEntries.Clear();
         for (int i = 0; i < entryList.Count; i++)
         {
-            instance.customerEntries.Add(entryList[i].entry);
-            entryList[i].entry.SetSiblingIndex(i);
+            instance.customerEntries.Add(entryList[i].Entry);
+            entryList[i].Entry.SetSiblingIndex(i);
         }
     }
 
-
-
     private static void Hook(HarmonyLib.Harmony harmony, Type targetType, string methodName, string hookMethod, Type[] arguments = null, bool postHook = true)
     {
-        MethodInfo method;
-        if(arguments == null)
-            method = targetType.GetMethod(methodName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-        else
-            method = targetType.GetMethod(methodName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, arguments);
+        MethodInfo method = (arguments == null) 
+            ? targetType.GetMethod(methodName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+            : targetType.GetMethod(methodName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, arguments);
 
         MethodInfo hook = typeof(Core).GetMethod(hookMethod, BindingFlags.Static | BindingFlags.NonPublic);
-
-
-        if (method == null || hook == null)
-        {
-            MelonLogger.Error("Failed to hook " + targetType.Name + " to " + methodName);
-            return;
-        }
+        if (method == null || hook == null) return;
 
         if (postHook)
             harmony.Patch(method, postfix: new HarmonyMethod(hook));
         else
             harmony.Patch(method, prefix: new HarmonyMethod(hook));
-
-        MelonLogger.Msg("Hooked " + targetType.Name + "." + methodName + " to " + hookMethod);
     }
 
     public override void OnSceneWasLoaded(int buildIndex, string sceneName)
     {
         if (sceneName == "Main" || sceneName == "Tutorial")
         {
-            harmony = new HarmonyLib.Harmony("BetterCustoimerList.Hooks");
-            Hook(harmony, typeof(CustomerSelector), "CreateEntry", nameof(CreateEntry_Hook), postHook:false);
-
+            harmony = new HarmonyLib.Harmony("BetterCustomerList.Hooks");
+            Hook(harmony, typeof(CustomerSelector), "CreateEntry", nameof(CreateEntry_Hook), postHook: false);
         }
-            base.OnSceneWasLoaded(buildIndex, sceneName);
+        base.OnSceneWasLoaded(buildIndex, sceneName);
     }
 
     public override void OnSceneWasUnloaded(int buildIndex, string sceneName)
     {
-        if(sceneName == "Main" || sceneName == "Tutorial")
+        if((sceneName == "Main" || sceneName == "Tutorial") && harmony != null)
         {
             harmony.UnpatchSelf();
-            MelonLogger.Msg("Unloaded Hooks.");
         }
         base.OnSceneWasUnloaded(buildIndex, sceneName);
     }
-
-    public override void OnDeinitializeMelon()
-    {
-        LoggerInstance.Msg("Better Customer List Unloaded.");
-        base.OnDeinitializeMelon();
-    }
-
 }
