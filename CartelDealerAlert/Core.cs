@@ -9,8 +9,10 @@ using Il2CppScheduleOne.NPCs;
 using Object = UnityEngine.Object;
 using Il2CppScheduleOne.Vision;
 using UnityEngine;
+using Il2CppScheduleOne.UI;
+using Il2CppScheduleOne.NPCs.CharacterClasses;
 
-[assembly: MelonInfo(typeof(CartelDealerAlert.Core), "CartelDealerAlert", "1.0.0", "Pyrex", null)]
+[assembly: MelonInfo(typeof(CartelDealerAlert.Core), "CartelDealerAlert", "1.0.1", "Pyrex", null)]
 [assembly: MelonGame("TVGS", "Schedule I")]
 
 namespace CartelDealerAlert
@@ -40,8 +42,10 @@ namespace CartelDealerAlert
             if(__instance.fullName == "Benzies Dealer")
             {
                 activeDealers.Add(__instance.Region.ToString());
-                if (playsound.Value)
+                if (playsound.Value){
+                    Object.FindObjectsOfType<VisionCone>()[25].ExclamationSound.AudioSource.bypassEffects = true;
                     Object.FindObjectsOfType<VisionCone>()[25].ExclamationSound.AudioSource.Play();
+                }
             }
         }
 
@@ -52,6 +56,17 @@ namespace CartelDealerAlert
                 activeDealers.Remove(__instance.Region.ToString());
             }
         }
+
+        private static void CartelActivateSpray_Hook(int activityIndex, CartelRegionActivities __instance)
+        {
+            if (activityIndex == 3)
+            {
+                Sprite sprite = Object.FindObjectsOfType<Thomas>()[0].MessagingIcon;
+                Object.FindObjectsOfType<NotificationsManager>()[0].SendNotification("Cartel Graffiti", $"Happening in {__instance.Region}", sprite, 7, true);
+                MelonLogger.Msg(__instance.Activities[activityIndex]);
+            }
+        }
+
 
         public override void OnInitializeMelon()
         {
@@ -116,6 +131,7 @@ namespace CartelDealerAlert
                 Hook(harmony, typeof(NPC), "EnterBuilding", nameof(NPCEnteredBuilding_Hook), arguments:[typeof(string), typeof(int)]);
                 Hook(harmony, typeof(NPC), "ExitBuilding", nameof(NPCExitedBuilding_Hook), arguments:[typeof(NPCEnterableBuilding)]);
                 Hook(harmony, typeof(CartelDealer), "DiedOrKnockedOut", nameof(CartelDealerDiedOrKnockedOut_Hook));
+                Hook(harmony, typeof(CartelRegionActivities), "StartAcivity", nameof(CartelActivateSpray_Hook));
             }
                 base.OnSceneWasLoaded(buildIndex, sceneName);
         }

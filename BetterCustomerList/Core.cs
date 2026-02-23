@@ -1,4 +1,4 @@
-﻿using Il2CppScheduleOne.Economy;
+﻿﻿using Il2CppScheduleOne.Economy;
 using Il2CppScheduleOne.UI.Phone;
 using MelonLoader;
 using UnityEngine;
@@ -15,7 +15,7 @@ using System.Collections.Generic;
 using static MelonLoader.Modules.MelonModule;
 using System.Diagnostics.Tracing;
 
-[assembly: MelonInfo(typeof(BetterCustomerList.Core), "BetterCustomerList", "1.0.3", "Pyrex", null)]
+[assembly: MelonInfo(typeof(BetterCustomerList.Core), "BetterCustomerList", "1.0.4", "Pyrex", null)]
 [assembly: MelonGame("TVGS", "Schedule I")]
 namespace BetterCustomerList;
 
@@ -61,6 +61,30 @@ public class Core : MelonMod
         SortEntries(__instance);
 
         return false;
+    }
+
+    private static void Open_Hook(CustomerSelector __instance)
+    {
+        for (int i = 0; i < __instance.customerEntries.Count; i++)
+        {
+            Customer customer = __instance.entryToCustomer[__instance.customerEntries[i]];
+            float relation_percent = (customer.NPC.RelationData.RelationDelta / 5) * 100;
+            string full_string = $"<size={fontsize.Value}>{customer.NPC.fullName}    ";
+            if (relation_percent == 100.0f)
+                full_string += $"<color=#ffcc00>{relation_percent.ToString("0")}%</color>";
+            else
+                full_string += $"{relation_percent.ToString("0")}%";
+            if (showregion.Value == true)
+            {
+                full_string += $" ({customer.NPC.Region})</size>";
+            }
+            else
+            {
+                full_string += "</size>";
+            }
+
+            __instance.customerEntries[i].Find("Name").GetComponent<Text>().text = full_string;
+        }
     }
 
     private static void SortEntries(CustomerSelector instance)
@@ -119,7 +143,7 @@ public class Core : MelonMod
         {
             harmony = new HarmonyLib.Harmony("BetterCustoimerList.Hooks");
             Hook(harmony, typeof(CustomerSelector), "CreateEntry", nameof(CreateEntry_Hook), postHook:false);
-
+            Hook(harmony, typeof(CustomerSelector), "Open", nameof(Open_Hook), postHook:false);
         }
             base.OnSceneWasLoaded(buildIndex, sceneName);
     }
