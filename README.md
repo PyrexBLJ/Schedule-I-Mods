@@ -9,3 +9,6 @@ Adds a percentage of your relationship with a customer on the list when assignin
 
 ![Cartel Dealer Alerts](https://github.com/PyrexBLJ/Schedule-I-Mods/tree/main/CartelDealerAlert)
 Puts a message on screen and plays a sound when a cartel dealer is out making a delivery. Tells you what part of town they are in so you can do hunt em down.
+
+![Cartel Comeback](https://github.com/PyrexBLJ/Schedule-I-Mods/tree/main/CartelComeback)
+Brings the random cartel events back after defeating the cartel, in a way that doesnt break progression but spices up the end game a bit to keep you on ur toes.

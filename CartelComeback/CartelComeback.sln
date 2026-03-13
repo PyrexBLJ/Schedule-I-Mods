@@ -1,0 +1,24 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CartelComeback", "CartelComeback.csproj", "{51E57714-0A6D-FF59-C0CA-6D7A73B57D5D}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{51E57714-0A6D-FF59-C0CA-6D7A73B57D5D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{51E57714-0A6D-FF59-C0CA-6D7A73B57D5D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{51E57714-0A6D-FF59-C0CA-6D7A73B57D5D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{51E57714-0A6D-FF59-C0CA-6D7A73B57D5D}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {3A7E3464-D6A7-441E-948E-C0500AEE7CE3}
+	EndGlobalSection
+EndGlobal
