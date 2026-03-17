@@ -15,7 +15,7 @@ using Il2CppSystem.Collections.Generic;
 using Il2CppGameKit.Utilities;
 using UnityEngine;
 
-[assembly: MelonInfo(typeof(CartelComeback.Core), "CartelComeback", "1.0.0", "Pyrex", null)]
+[assembly: MelonInfo(typeof(CartelComeback.Core), "CartelComeback", "1.0.1", "Pyrex", null)]
 [assembly: MelonGame("TVGS", "Schedule I")]
 
 namespace CartelComeback

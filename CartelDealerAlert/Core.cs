@@ -11,8 +11,11 @@ using Il2CppScheduleOne.Vision;
 using UnityEngine;
 using Il2CppScheduleOne.UI;
 using Il2CppScheduleOne.NPCs.CharacterClasses;
+using Il2CppScheduleOne.NPCs.Behaviour;
+using Il2CppScheduleOne.PlayerScripts;
+using Il2CppScheduleOne.DevUtilities;
 
-[assembly: MelonInfo(typeof(CartelDealerAlert.Core), "CartelDealerAlert", "1.0.1", "Pyrex", null)]
+[assembly: MelonInfo(typeof(CartelDealerAlert.Core), "CartelDealerAlert", "1.0.4", "Pyrex", null)]
 [assembly: MelonGame("TVGS", "Schedule I")]
 
 namespace CartelDealerAlert
@@ -43,8 +46,8 @@ namespace CartelDealerAlert
             {
                 activeDealers.Add(__instance.Region.ToString());
                 if (playsound.Value){
-                    Object.FindObjectsOfType<VisionCone>()[25].ExclamationSound.AudioSource.bypassEffects = true;
-                    Object.FindObjectsOfType<VisionCone>()[25].ExclamationSound.AudioSource.Play();
+                    Object.FindObjectsOfType<VisionCone>()[0].ExclamationSound._audioSource.gameObject.transform.position = Player.Local.CameraPosition;
+                    Object.FindObjectsOfType<VisionCone>()[0].ExclamationSound._audioSource.Play();
                 }
             }
         }
@@ -57,14 +60,12 @@ namespace CartelDealerAlert
             }
         }
 
-        private static void CartelActivateSpray_Hook(int activityIndex, CartelRegionActivities __instance)
+        private static void EnableGraffitiBehavior_Hook(GraffitiBehaviour __instance)
         {
-            if (activityIndex == 3)
-            {
-                Sprite sprite = Object.FindObjectsOfType<Thomas>()[0].MessagingIcon;
-                Object.FindObjectsOfType<NotificationsManager>()[0].SendNotification("Cartel Graffiti", $"Happening in {__instance.Region}", sprite, 7, true);
-                MelonLogger.Msg(__instance.Activities[activityIndex]);
-            }
+            Sprite sprite = GameObject.Find("Thomas").GetComponentInChildren<Thomas>().MessagingIcon;
+            EMapRegion region = Singleton<Map>.Instance.GetRegionFromPosition(__instance.Npc.LookAtPoint);
+            Singleton<NotificationsManager>.Instance.SendNotification("Cartel Graffiti", $"Happening in {region}", sprite, 7, true);
+            MelonLogger.Msg($"Graffiti in {region}");
         }
 
 
@@ -131,7 +132,7 @@ namespace CartelDealerAlert
                 Hook(harmony, typeof(NPC), "EnterBuilding", nameof(NPCEnteredBuilding_Hook), arguments:[typeof(string), typeof(int)]);
                 Hook(harmony, typeof(NPC), "ExitBuilding", nameof(NPCExitedBuilding_Hook), arguments:[typeof(NPCEnterableBuilding)]);
                 Hook(harmony, typeof(CartelDealer), "DiedOrKnockedOut", nameof(CartelDealerDiedOrKnockedOut_Hook));
-                Hook(harmony, typeof(CartelRegionActivities), "StartAcivity", nameof(CartelActivateSpray_Hook));
+                Hook(harmony, typeof(GraffitiBehaviour), "Enable", nameof(EnableGraffitiBehavior_Hook));
             }
                 base.OnSceneWasLoaded(buildIndex, sceneName);
         }

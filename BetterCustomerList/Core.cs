@@ -15,7 +15,7 @@ using System.Collections.Generic;
 using static MelonLoader.Modules.MelonModule;
 using System.Diagnostics.Tracing;
 
-[assembly: MelonInfo(typeof(BetterCustomerList.Core), "BetterCustomerList", "1.0.4", "Pyrex", null)]
+[assembly: MelonInfo(typeof(BetterCustomerList.Core), "BetterCustomerList", "1.0.5", "Pyrex", null)]
 [assembly: MelonGame("TVGS", "Schedule I")]
 namespace BetterCustomerList;
 
@@ -141,7 +141,7 @@ public class Core : MelonMod
     {
         if (sceneName == "Main" || sceneName == "Tutorial")
         {
-            harmony = new HarmonyLib.Harmony("BetterCustoimerList.Hooks");
+            harmony = new HarmonyLib.Harmony("BetterCustomerList.Hooks");
             Hook(harmony, typeof(CustomerSelector), "CreateEntry", nameof(CreateEntry_Hook), postHook:false);
             Hook(harmony, typeof(CustomerSelector), "Open", nameof(Open_Hook), postHook:false);
         }
